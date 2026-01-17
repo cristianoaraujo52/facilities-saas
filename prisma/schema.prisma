@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Core Kernel
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(ESSENTIALS) // Monetization Tier
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  users          User[]
+  buildings      Building[]
+  assets         Asset[]
+  suppliers      Supplier[]
+  workOrders     WorkOrder[]
+  verificationDocs ComplianceDoc[]
+}
+
+enum Plan {
+  ESSENTIALS
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(TECHNICIAN)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  assignedOrders WorkOrder[] // As Assignee
+  createdOrders  WorkOrder[] @relation("CreatedBy")
+  auditLogs      AuditLog[]
+}
+
+enum Role {
+  ADMIN       // Tenant Admin
+  MANAGER     // Facilities Manager
+  TECHNICIAN  // Internal Staff
+  AUDITOR     // External Auditor
+  SUPPLIER    // External Vendor User
+}
+
+// Operational Models
+model Building {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  assets     Asset[]
+  workOrders WorkOrder[]
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  qrCode      String?  @unique
+  category    String?  // e.g., "HVAC", "Electrical"
+  
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  workOrders WorkOrder[]
+}
+
+model WorkOrder {
+  id          String   @id @default(uuid())
+  ticketId    Int      @default(autoincrement()) // Human friendly generic ID
+  title       String
+  description String?
+  status      Status   @default(OPEN)
+  priority    Priority @default(NORMAL)
+  
+  // SLA & Dates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slaDeadline DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Relations
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  buildingId  String?
+  building    Building? @relation(fields: [buildingId], references: [id])
+  
+  assetId     String?
+  asset       Asset?   @relation(fields: [assetId], references: [id])
+  
+  assigneeId  String?
+  assignee    User?    @relation(fields: [assigneeId], references: [id])
+  
+  creatorId   String
+  creator     User     @relation("CreatedBy", fields: [creatorId], references: [id])
+  
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  
+  evidencePhotos EvidencePhoto[]
+}
+
+model EvidencePhoto {
+  id          String    @id @default(uuid())
+  url         String
+  
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  VERIFIED
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+// Supplier Management
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  rating    Float?   // Calculated average
+  workOrders WorkOrder[]
+  files     ComplianceDoc[]
+}
+
+// Compliance Module
+model ComplianceDoc {
+  id          String   @id @default(uuid())
+  title       String   // e.g. "AVCB", "Insurance Policy"
+  fileUrl     String
+  expiryDate  DateTime
+  isValid     Boolean  @default(true)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+}
+
+// Audit
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String   // "CREATE_OS", "DELETE_USER"
+  metadata  Json?    // Detailed diff
+  timestamp DateTime @default(now())
+  
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+}
