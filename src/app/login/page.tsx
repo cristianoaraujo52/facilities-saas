@@ -12,21 +12,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Building2 } from "lucide-react"
+import { useActionState } from "react"
+import { authenticate } from "./actions"
 
 export default function LoginPage() {
-
-    // Simple client-side only mock login for demonstration since Server Actions need more setup
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        // In a real app we would call authenticate(formData) server action
-        // For now we just redirect manually to simulate "Login" success from the middleware POV if we had a cookie
-        // But since we can't easily set the cookie from client without the real action working...
-
-        // Actually, for this "Mock" phase to work with the middleware, we NEED the real signIn logic.
-        // But creating the server action and wiring it up might be complex if the DB is failing.
-        // Let's just create a UI that redirects to dashboard for "Demo" purposes.
-        window.location.href = "/dashboard";
-    }
+    const [errorMessage, formAction, isPending] = useActionState(
+        authenticate,
+        undefined,
+    );
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
@@ -43,27 +36,39 @@ export default function LoginPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleLogin}>
+                    <form action={formAction}>
                         <div className="grid gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email</Label>
-                                <Input id="email" type="email" placeholder="m@example.com" required defaultValue="admin@admin.com" />
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="m@example.com"
+                                    required
+                                    defaultValue="admin@admin.com"
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <div className="flex items-center">
                                     <Label htmlFor="password">Senha</Label>
-                                    {/* <Link href="#" className="ml-auto text-sm underline">
-                      Esqueceu a senha?
-                    </Link> */}
                                 </div>
-                                <Input id="password" type="password" required defaultValue="admin123" />
+                                <Input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    required
+                                    defaultValue="admin123"
+                                />
                             </div>
-                            <Button type="submit" className="w-full">
-                                Entrar no Sistema
+                            {errorMessage && (
+                                <div className="text-sm text-red-500 text-center">
+                                    {errorMessage}
+                                </div>
+                            )}
+                            <Button type="submit" className="w-full" disabled={isPending}>
+                                {isPending ? "Entrando..." : "Entrar no Sistema"}
                             </Button>
-                            {/* <Button variant="outline" className="w-full">
-                  Entrar com Google
-                </Button> */}
                         </div>
                     </form>
                 </CardContent>
